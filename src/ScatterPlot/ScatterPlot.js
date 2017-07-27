@@ -99,6 +99,12 @@ class ScatterPlot extends Component {
             },
             options: {
                 scales: {
+                    yAxes: [{
+                        scaleLabel: {
+                            display: true,
+                            labelString: "Ranking",
+                        }
+                    }],
                     xAxes: [{
                         type: 'time',
                         time: {
@@ -107,6 +113,10 @@ class ScatterPlot extends Component {
                             },
                             unit: 'minute',
                             minUnit: "minute",
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: "Performance Time",
                         }
                     }],
                 },
@@ -141,6 +151,9 @@ class ScatterPlot extends Component {
                             return label;
                         }
                     }
+                },
+                legend: {
+                    display: false,
                 }
             }
         });
@@ -151,7 +164,7 @@ class ScatterPlot extends Component {
         console.log(width, height);
 
         return  (
-            <div>
+            <div className="canvasContainer" >
                 <canvas 
                 ref={node => this.node = node}
                 id="myChart" 
