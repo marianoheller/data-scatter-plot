@@ -4,7 +4,8 @@
   "homepage": "https://marianoheller.github.io/data-scatter-plot",
   "private": true,
   "dependencies": {
-    "chart.js": "^2.6.0",
+    "d3": "^4.10.2",
+    "d3-tip": "^0.7.1",
     "react": "^15.6.1",
     "react-dom": "^15.6.1"
   },

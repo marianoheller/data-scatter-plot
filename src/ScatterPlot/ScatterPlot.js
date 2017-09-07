@@ -1,32 +1,41 @@
 import React, { Component } from 'react';
-import Chart from 'chart.js';
 import './ScatterPlot.css';
-
 import dataJson from  '../dataset.json';
+import * as d3 from 'd3';
+import d3Tip from "d3-tip";
 
 
 export default class ScatterPlotContainer extends Component {
 
-    parseTime( time ) {
-        const timeArray = time.split(":");
-        return new Date(0,0,0,0,timeArray[0], timeArray[1]);
-    }
-
     loadData() {
+        const parseTime = (time) => time.split(":")
+        .map(Number)
+        .reverse()
+        .reduce( (acc, t,i) => acc+t*60 );
+
         return dataJson.map( (d) => {
             return {
                 ...d,
-                TimeForChart: this.parseTime(d.Time),
-                Time: d.Time,
-                Place: parseInt(d.Place, 10),
+                Seconds: parseTime(d.Time),
             }
-        })
+        } );
     }
 
     render() {
+        const size = {
+            width: 1000, 
+            height: 500,
+            margin: {
+                top: 50,
+                right: 10,
+                bottom: 20,
+                left: 40,
+            },
+        };
+
         return (
             <div>
-                <ScatterPlot data={this.loadData()} size={ {width: "200", height: "100"} }/>
+                <ScatterPlot data={this.loadData()} size={ size }/>
             </div>
         )
     }
@@ -52,128 +61,138 @@ class ScatterPlot extends Component {
 
     
     createScatterPlot() {
-        const node = this.node;
+        const { height, width, margin } = this.props.size;
         const { data } = this.props;
 
-        const doped = {
-            pointBackgroundColor: `rgba(200, 0, 0, 0.5)`,
-            pointBorderColor: `rgba(200, 0, 0, 0.9)`
+        function pad(n, width, z) {
+            z = z || '0';
+            n = n + '';
+            return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+        }
+
+        const createTimeLabel = (timeString) => {
+            const mins = Math.floor(timeString/60);
+            const secs = timeString%60;
+            return `${pad(mins,2)}:${pad(secs,2)}`;
         };
-        const didntDoped = {
-            pointBackgroundColor: `rgba(80, 250, 80, 0.5)`,
-            pointBorderColor: `rgba(80, 250, 80, 0.9)`
-        };
 
-        const colors = data.reduce( (acc, d) => {
-            if ( !acc.pointBackgroundColor ) { acc.pointBackgroundColor = [] }
-            if ( !acc.pointBorderColor ) { acc.pointBorderColor = [] }
-            if ( d.Doping ) {
-                acc.pointBackgroundColor.push( doped.pointBackgroundColor );
-                acc.pointBorderColor.push( doped.pointBorderColor );
-            }
-            else {
-                acc.pointBackgroundColor.push( didntDoped.pointBackgroundColor );
-                acc.pointBorderColor.push( didntDoped.pointBorderColor );
-            }
-            
-            return acc;
-        }, {} );
+        const svg = d3.select("#chartContainer")
+        .append("svg")
+        .attr("height", height)
+        .attr("width", width );
 
-        return new Chart(node, {
-            type: 'scatter',
-            data: {
-                datasets: [{
-                    label: 'Professional Bicycle Racing Dataset',
-                    pointBackgroundColor: colors.pointBackgroundColor,
-                    pointBorderColor: colors.pointBorderColor,
-                    data: data.map( (d) => {
-                        return {
-                            x: d.TimeForChart,
-                            y: d.Place,
-                        }
-                    }),
-                    pointRadius: 5,
-                    fill: false,
-                    showLine: false,
-                }],
-            },
-            options: {
-                scales: {
-                    yAxes: [{
-                        scaleLabel: {
-                            display: true,
-                            labelString: "Ranking",
-                        }
-                    }],
-                    xAxes: [{
-                        type: 'time',
-                        time: {
-                            displayFormats: {
-                                minute: 'mm:ss'
-                            },
-                            unit: 'minute',
-                            minUnit: "minute",
-                        },
-                        scaleLabel: {
-                            display: true,
-                            labelString: "Performance Time",
-                        }
-                    }],
-                },
-                title: {
-                    display: true,
-                    text: 'Doping in Professional Bicycle Racing'
-                },
-                tooltips: {
-                    callbacks: {
-                        label: () => {
-                            return "";
-                        },
-                        beforeLabel: ( tooltipItem, config) => {
-
-                            const pad = function _pad(n, width=2, z) {
-                                z = z || '0';
-                                n = n + '';
-                                return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
-                            }
-
-                            const m = tooltipItem.xLabel.getMinutes();
-                            const s = tooltipItem.xLabel.getSeconds();
-                            const target = data.find( (d) => d.Time === `${pad(m)}:${pad(s)}` );
-                            if ( !target )  { return `Error finding the target object. ${m}:${s}`}
-                            
-                            const label = [
-                                target.Name,
-                                `${target.Nationality}, ${target.Year}`,
-                                target.Time                                
-                            ];
-                            if (target.Doping) {  label.push(target.Doping)  }
-                            return label;
-                        }
-                    }
-                },
-                legend: {
-                    display: false,
-                }
-            }
+        const tip = d3Tip()
+        .attr("id", "tooltip")
+        .html( (d) => {
+            return `
+            Time: ${d.Time}<br>
+            Year: ${d.Year}`;
         });
+
+        svg.call(tip);
+
+        const minTime = new Date( d3.min( data.map( (d) => d.Seconds )) );
+        const maxTime = new Date( d3.max( data.map( (d) => d.Seconds )) );
+        const dataHeight = height - margin.top - margin.bottom;
+        const yScale = d3.scaleLinear()
+        .domain( [minTime, maxTime] )
+        .range( [0, dataHeight] );
+
+        const minYear = d3.min( data.map( (d) => d.Year ) );
+        const maxYear = d3.max( data.map( (d) => d.Year ) );
+        const dataWidth = width - margin.left - margin.right;
+        const xScale = d3.scaleLinear()
+        .domain( [minYear-1, maxYear+1])
+        .range( [0, dataWidth] );
+
+        const middleData = (width - margin.left - margin.right)/2
+        svg.append("text")
+        .attr("id", "title")
+        .attr("text-anchor", "middle")
+        .attr("transform", `translate( ${middleData+margin.left} ,${margin.top/2})`)
+        .text("Doping in Professional Bicycle Racing");
+
+        const dataTypes = data.reduce( (acc, d) => {
+            const dataType = d.Doping ? {
+                text: "Doped",
+                class: "doped",
+            } : {
+                text: "Didn't dope",
+                class: "nonDoped",
+            };
+            const isLegend = acc.filter( (a) => a.class === dataType.class ).length === 0;
+            if ( isLegend ) acc.push(dataType);
+            return acc;
+        } , []);
+        const legend = svg.append("g")
+        .attr("id", "legend")
+        .attr("transform", `translate(${3*width/4}, ${height/4})`)
+        .style("font-size","12px")
+        .selectAll("g")
+        .data(dataTypes)
+        .enter()
+            .append("g")
+            .append("rect")
+            .attr("height", 15)
+            .attr("width", 15)
+            .attr("stroke", "black")
+            .attr("class", (d) => d.class )
+            .attr("y", (d,i) => 18*i)
+            .append("text")
+            .attr("y", 0)
+            .attr("x", 0)
+            .text("asdsad");
+
+        svg.append("g")
+        .attr("id", "x-axis")
+        .attr("transform", `translate(${margin.left}, ${height - margin.bottom})`)
+        .call(d3.axisBottom(xScale)
+        .tickFormat(d3.format(".4")));
+
+        svg.append("g")
+        .attr("id", "y-axis")
+        .attr("transform", `translate(${margin.left}, ${margin.top})`)
+        .call(d3.axisLeft(yScale)
+            .ticks(20)
+            .tickFormat(createTimeLabel) );
+
+        svg.append("g")
+        .attr("transform", `translate(${margin.left}, ${margin.top})`)
+        .selectAll(".dot")
+        .data(data)
+        .enter()
+            .append("circle")
+            .attr("class", (d) => {
+                const dopingClass =  d.Doping ? "doped" : "nonDoped";
+                return "dot " + dopingClass;
+            })
+            .attr("cx", (d) => xScale(d.Year) )
+            .attr("cy", (d) => yScale(d.Seconds) )
+            .attr("r", 0)
+            .attr("data-xvalue", (d) => d.Year )
+            .attr("data-yvalue", (d) => {
+                const timeArr = d.Time.split(":").map(Number);
+                const now = new Date();
+                now.setMinutes(timeArr[0], timeArr[1]);
+                return now;
+            } )
+            .on("mouseover", (d, i) => {
+                tip.attr("data-year", d.Year)
+                return tip.show(d,i);
+            } )
+            .on( "mouseout", tip.hide )
+            .transition()
+                .duration(800)
+                .attr("r", 6)
+                .transition(200)
+                    .attr("r", 5)
+
     }
     
     render() {
-        const { width, height } = this.props.size;
-        console.log(width, height);
 
         return  (
-            <div className="canvasContainer" >
-                <canvas 
-                ref={node => this.node = node}
-                id="myChart" 
-                width={width} 
-                height={height}
-                ></canvas>
-                <div className="legend">
-                    {this.props.legend}
-                </div>
+            <div id="chartContainer" >
             </div>
         
         )

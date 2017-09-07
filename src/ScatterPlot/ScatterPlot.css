@@ -1,8 +1,25 @@
-.legend {
-    font-size: small;
-    color: grey;
+.dot {
+    fill: teal;
+    stroke: black;
 }
 
-.canvasContainer {
-    padding: 1em;
+.doped {
+    fill: red;
+}
+
+.nonDoped {
+    fill: teal;
+}
+
+#tooltip {
+    background-color: rgba(0, 0, 0, 0.75);
+    color: white;
+    font-weight: bold;
+
+    border-radius: 5px;
+    padding: 7px 10px;
+}
+
+#title {
+    font-size: 2em;
 }
