@@ -3,6 +3,7 @@ import './ScatterPlot.css';
 import dataJson from  '../dataset.json';
 import * as d3 from 'd3';
 import d3Tip from "d3-tip";
+import d3Legend from 'd3-svg-legend';
 
 
 export default class ScatterPlotContainer extends Component {
@@ -64,23 +65,29 @@ class ScatterPlot extends Component {
         const { height, width, margin } = this.props.size;
         const { data } = this.props;
 
+
+        //Padding helper function
         function pad(n, width, z) {
             z = z || '0';
             n = n + '';
             return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
         }
 
+        //Data label formatter ( for y axis )
         const createTimeLabel = (timeString) => {
             const mins = Math.floor(timeString/60);
             const secs = timeString%60;
             return `${pad(mins,2)}:${pad(secs,2)}`;
         };
 
+        //Create SVG
         const svg = d3.select("#chartContainer")
         .append("svg")
         .attr("height", height)
         .attr("width", width );
 
+
+        //Tooltip init
         const tip = d3Tip()
         .attr("id", "tooltip")
         .html( (d) => {
@@ -88,9 +95,10 @@ class ScatterPlot extends Component {
             Time: ${d.Time}<br>
             Year: ${d.Year}`;
         });
-
         svg.call(tip);
 
+
+        // Y Scale
         const minTime = new Date( d3.min( data.map( (d) => d.Seconds )) );
         const maxTime = new Date( d3.max( data.map( (d) => d.Seconds )) );
         const dataHeight = height - margin.top - margin.bottom;
@@ -98,6 +106,8 @@ class ScatterPlot extends Component {
         .domain( [minTime, maxTime] )
         .range( [0, dataHeight] );
 
+
+        //X Scale
         const minYear = d3.min( data.map( (d) => d.Year ) );
         const maxYear = d3.max( data.map( (d) => d.Year ) );
         const dataWidth = width - margin.left - margin.right;
@@ -105,6 +115,8 @@ class ScatterPlot extends Component {
         .domain( [minYear-1, maxYear+1])
         .range( [0, dataWidth] );
 
+
+        //Title
         const middleData = (width - margin.left - margin.right)/2
         svg.append("text")
         .attr("id", "title")
@@ -112,43 +124,50 @@ class ScatterPlot extends Component {
         .attr("transform", `translate( ${middleData+margin.left} ,${margin.top/2})`)
         .text("Doping in Professional Bicycle Racing");
 
+
+        //Legend
         const dataTypes = data.reduce( (acc, d) => {
             const dataType = d.Doping ? {
                 text: "Doped",
                 class: "doped",
+                color: "red",
             } : {
                 text: "Didn't dope",
                 class: "nonDoped",
+                color: "teal",
             };
             const isLegend = acc.filter( (a) => a.class === dataType.class ).length === 0;
             if ( isLegend ) acc.push(dataType);
             return acc;
         } , []);
-        const legend = svg.append("g")
-        .attr("id", "legend")
-        .attr("transform", `translate(${3*width/4}, ${height/4})`)
-        .style("font-size","12px")
-        .selectAll("g")
-        .data(dataTypes)
-        .enter()
-            .append("g")
-            .append("rect")
-            .attr("height", 15)
-            .attr("width", 15)
-            .attr("stroke", "black")
-            .attr("class", (d) => d.class )
-            .attr("y", (d,i) => 18*i)
-            .append("text")
-            .attr("y", 0)
-            .attr("x", 0)
-            .text("asdsad");
 
+        const ordinal = d3.scaleOrdinal()
+        .domain( dataTypes.map( (d) => d.text) )
+        .range( dataTypes.map( (d) => d.color) );
+
+        svg.append("g")
+        .attr("id", "legend")
+        .attr("class", "legendOrdinal")
+        .attr("transform", `translate(${3*width/4}, ${height/4})`)
+
+        const legendOrdinal = d3Legend.legendColor()
+        .shape("path", d3.symbol().type(d3.symbolSquare).size(150)())
+        .shapePadding(10)
+        .scale(ordinal);
+
+        svg.select(".legendOrdinal")
+        .call(legendOrdinal);
+              
+
+        //X axis
         svg.append("g")
         .attr("id", "x-axis")
         .attr("transform", `translate(${margin.left}, ${height - margin.bottom})`)
         .call(d3.axisBottom(xScale)
         .tickFormat(d3.format(".4")));
 
+
+        //Y axis
         svg.append("g")
         .attr("id", "y-axis")
         .attr("transform", `translate(${margin.left}, ${margin.top})`)
@@ -156,6 +175,8 @@ class ScatterPlot extends Component {
             .ticks(20)
             .tickFormat(createTimeLabel) );
 
+
+        //Data dots
         svg.append("g")
         .attr("transform", `translate(${margin.left}, ${margin.top})`)
         .selectAll(".dot")
